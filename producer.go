@@ -237,6 +237,7 @@ stop:
 				log.Println("Received message to send. Total messages received: " + strconv.FormatInt(p.getMsgCount(), 10))
 			}
 
+			// TODO interface out kinesis / firehose as common client interface
 			kargs := p.args()
 			fargs := p.firehoseArgs()
 
@@ -260,6 +261,7 @@ stop:
 				}()
 			}
 
+			// TODO releasing the semaphore when the sendRecords above are async
 			<-p.sem
 
 			break
@@ -267,6 +269,7 @@ stop:
 			go p.handleInterrupt(sig)
 			break stop
 		case err := <-p.Errors():
+			// TODO these errors only increment when channel is used which is only in verbose mode
 			p.incErrCount()
 			p.wg.Add(1)
 			go func() {
@@ -274,6 +277,8 @@ stop:
 				p.wg.Done()
 			}()
 
+			// TODO moved semaphore release out of handleError to here where it was acquired
+			// was originally deferred after wg.Done()
 			<-p.sem
 		}
 	}
@@ -288,6 +293,8 @@ func (p *Producer) Messages() <-chan *Message {
 func (p *Producer) Errors() <-chan error {
 	return p.errors
 }
+
+// TODO combine Send and TryToSend to have a common send internal func they use
 
 // Send a message to the queue for POSTing
 func (p *Producer) Send(msg *Message) {
@@ -337,6 +344,7 @@ func (p *Producer) sendRecords(args *gokinesis.RequestArgs) {
 	}
 
 	putResp, err := p.client.PutRecords(args)
+	// TODO we populate error channel here and then also below; This just used for general errors
 	if err != nil && conf.Debug.Verbose {
 		p.errors <- err
 	}
